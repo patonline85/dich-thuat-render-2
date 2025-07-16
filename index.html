@@ -65,7 +65,6 @@
                 <div>
                     <label for="vietnamese-text" class="block text-lg font-semibold mb-2 text-gray-700">Bản dịch tiếng Việt</label>
                     <div class="relative">
-                        <!-- **** THAY ĐỔI #3: Đổi textarea thành div để hiển thị định dạng tốt hơn **** -->
                         <div id="vietnamese-text" style="white-space: pre-wrap; min-height: 358px;" class="w-full p-4 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition duration-300"></div>
                      </div>
                 </div>
@@ -96,10 +95,9 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // DOM Elements
             const translateButton = document.getElementById('translate-button');
             const chineseTextArea = document.getElementById('chinese-text');
-            const vietnameseOutputDiv = document.getElementById('vietnamese-text'); // Đã đổi thành div
+            const vietnameseOutputDiv = document.getElementById('vietnamese-text');
             const copyButton = document.getElementById('copy-button');
             const clearButton = document.getElementById('clear-button');
             const loader = document.getElementById('loader');
@@ -114,14 +112,12 @@
 
             clearButton.addEventListener('click', () => {
                 chineseTextArea.value = '';
-                vietnameseOutputDiv.textContent = ''; // Đổi từ .value sang .textContent
+                vietnameseOutputDiv.textContent = '';
                 showToast('Đã xóa nội dung.');
             });
             
-            // **** THAY ĐỔI #4: Cập nhật toàn bộ logic dịch thuật ****
             translateButton.addEventListener('click', async () => {
                 const chineseText = chineseTextArea.value.trim();
-
                 if (!chineseText) {
                     showToast("Vui lòng nhập văn bản tiếng Trung.");
                     return;
@@ -130,7 +126,8 @@
                 loader.classList.remove('hidden');
                 buttonText.textContent = 'Đang dịch...';
                 translateButton.disabled = true;
-                vietnameseOutputDiv.textContent = ''; // Xóa kết quả cũ
+                vietnameseOutputDiv.textContent = '';
+                vietnameseOutputDiv.style.color = 'inherit'; // Reset màu chữ
 
                 try {
                     const response = await fetch('/api/translate', {
@@ -144,31 +141,34 @@
                         throw new Error(errorText);
                     }
 
-                    // Bắt đầu xử lý luồng dữ liệu (stream)
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
-                    let fullText = '';
+                    let buffer = '';
 
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) break;
                         
-                        const chunk = decoder.decode(value, { stream: true });
+                        buffer += decoder.decode(value, { stream: true });
                         
-                        // Gemini gửi về các chunk dữ liệu, chúng ta cần xử lý để lấy text
-                        const lines = chunk.split('\n');
-                        for (const line of lines) {
+                        // Xử lý tất cả các dòng hoàn chỉnh trong buffer
+                        let boundary;
+                        while ((boundary = buffer.indexOf('\n')) >= 0) {
+                            const line = buffer.substring(0, boundary).trim();
+                            buffer = buffer.substring(boundary + 1); // Giữ lại phần còn lại
+
                             if (line.startsWith('data: ')) {
                                 try {
                                     const jsonStr = line.substring(6);
-                                    const parsed = JSON.parse(jsonStr);
-                                    const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-                                    if (textPart) {
-                                        fullText += textPart;
-                                        vietnameseOutputDiv.textContent = fullText; // Cập nhật giao diện ngay lập tức
+                                    if (jsonStr) {
+                                        const parsed = JSON.parse(jsonStr);
+                                        const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                                        if (textPart) {
+                                            vietnameseOutputDiv.textContent += textPart;
+                                        }
                                     }
                                 } catch (e) {
-                                    // Bỏ qua các dòng JSON không hoàn chỉnh, tiếp tục xử lý
+                                    console.warn("Bỏ qua chunk JSON không hợp lệ:", line);
                                 }
                             }
                         }
@@ -177,6 +177,7 @@
                 } catch (error) {
                     console.error("Lỗi chi tiết khi dịch:", error);
                     vietnameseOutputDiv.textContent = `Đã xảy ra lỗi khi dịch. Vui lòng thử lại sau.\n\nChi tiết: ${error.message}`;
+                    vietnameseOutputDiv.style.color = 'red';
                     showToast("Đã có lỗi xảy ra. Vui lòng thử lại.");
                 } finally {
                     loader.classList.add('hidden');
@@ -185,10 +186,9 @@
                 }
             });
 
-            // Cập nhật hàm sao chép để lấy text từ div
             copyButton.addEventListener('click', () => {
                 const chineseText = chineseTextArea.value.trim();
-                const vietnameseText = vietnameseOutputDiv.textContent.trim(); // Đổi từ .value sang .textContent
+                const vietnameseText = vietnameseOutputDiv.textContent.trim();
 
                 if (!chineseText && !vietnameseText) {
                     showToast("Không có nội dung để sao chép.");
