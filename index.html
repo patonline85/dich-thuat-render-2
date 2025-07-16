@@ -129,7 +129,7 @@
                 loader.classList.remove('hidden');
                 buttonText.textContent = 'Đang dịch...';
                 translateButton.disabled = true;
-                vietnameseOutputDiv.textContent = '';
+                vietnameseOutputDiv.textContent = ''; // Xóa kết quả cũ
                 vietnameseOutputDiv.style.color = 'inherit';
 
                 try {
@@ -138,50 +138,16 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ chineseText: chineseText })
                     });
+                    
+                    const data = await response.json();
 
                     if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(errorText || `Lỗi từ server: ${response.status}`);
+                        // Nếu server trả về lỗi, hiển thị lỗi đó
+                        throw new Error(data.error || `Lỗi không xác định từ server.`);
                     }
-
-                    const reader = response.body.getReader();
-                    const decoder = new TextDecoder();
-                    let buffer = '';
-
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) {
-                            break;
-                        }
-                        
-                        buffer += decoder.decode(value, { stream: true });
-                        
-                        // SỬA LỖI QUAN TRỌNG: Xử lý các gói dữ liệu (event) hoàn chỉnh
-                        // Một event được ngăn cách bởi hai ký tự xuống dòng (\n\n)
-                        let eventBoundary;
-                        while ((eventBoundary = buffer.indexOf('\n\n')) >= 0) {
-                            // Lấy toàn bộ nội dung của một event
-                            const eventText = buffer.substring(0, eventBoundary);
-                            // Cập nhật lại buffer, bỏ đi phần đã xử lý
-                            buffer = buffer.substring(eventBoundary + 2);
-
-                            if (eventText.startsWith('data:')) {
-                                try {
-                                    // Bỏ 'data: ' và lấy chuỗi JSON
-                                    const jsonStr = eventText.substring(6).trim();
-                                    if (jsonStr) {
-                                        const parsed = JSON.parse(jsonStr);
-                                        const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-                                        if (textPart) {
-                                            vietnameseOutputDiv.textContent += textPart;
-                                        }
-                                    }
-                                } catch (e) {
-                                    console.warn("Bỏ qua chunk JSON không hợp lệ:", eventText, e);
-                                }
-                            }
-                        }
-                    }
+                    
+                    // Hiển thị toàn bộ bản dịch trong một lần
+                    vietnameseOutputDiv.textContent = data.translation;
 
                 } catch (error) {
                     console.error("Lỗi chi tiết khi dịch:", error);
@@ -206,10 +172,9 @@
 
                 const textToCopy = `Bản gốc:\n${chineseText}\n\nBản dịch:\n${vietnameseText}`;
                 
-                // Sử dụng document.execCommand để tương thích tốt hơn trong iframe
                 const textArea = document.createElement("textarea");
                 textArea.value = textToCopy;
-                textArea.style.position = "fixed"; // Tránh cuộn trang
+                textArea.style.position = "fixed";
                 document.body.appendChild(textArea);
                 textArea.focus();
                 textArea.select();
