@@ -64,8 +64,6 @@ ${chineseText}
 
     // Hàm xử lý buffer để tìm các đối tượng JSON hoàn chỉnh
     const processBuffer = () => {
-        // Luồng dữ liệu từ Google là một chuỗi JSON array, ví dụ: "[{...}, {...}]"
-        // Chúng ta cần tìm từng đối tượng {...} hoàn chỉnh một.
         let braceCount = 0;
         let objectStartIndex = -1;
 
@@ -78,23 +76,15 @@ ${chineseText}
             } else if (buffer[i] === '}') {
                 braceCount--;
                 if (braceCount === 0 && objectStartIndex !== -1) {
-                    // Khi số lượng dấu '{' và '}' bằng nhau, ta đã tìm thấy một đối tượng hoàn chỉnh
                     const objectStr = buffer.substring(objectStartIndex, i + 1);
-                    
                     try {
-                        // Kiểm tra xem có phải là JSON hợp lệ không
                         JSON.parse(objectStr); 
-                        // Gửi đối tượng JSON hợp lệ này về client theo đúng định dạng SSE
                         res.write(`data: ${objectStr}\n\n`);
-                        
-                        // Cắt bỏ phần đã xử lý khỏi buffer
                         buffer = buffer.substring(i + 1);
-                        // Reset vòng lặp để quét phần còn lại của buffer
                         i = -1; 
                         objectStartIndex = -1;
                     } catch (e) {
-                        // Bỏ qua nếu không phải JSON hợp lệ (ví dụ: chuỗi có chứa dấu '{' hoặc '}')
-                        // và tiếp tục tìm kiếm
+                        // Bỏ qua nếu không phải JSON hợp lệ và tiếp tục tìm kiếm
                     }
                 }
             }
@@ -104,19 +94,22 @@ ${chineseText}
     // Vòng lặp đọc dữ liệu từ Google
     while (true) {
         const { done, value } = await reader.read();
+        
+        // SỬA LỖI QUAN TRỌNG:
+        // Giải mã chunk dữ liệu, sử dụng { stream: !done } để xử lý chính xác
+        // các ký tự đa byte (như tiếng Việt) bị ngắt quãng giữa các chunk.
+        buffer += decoder.decode(value, { stream: !done });
+        processBuffer();
+
         if (done) {
             break;
         }
-        // Thêm dữ liệu mới vào buffer và xử lý
-        buffer += decoder.decode(value);
-        processBuffer();
     }
 
     res.end();
 
   } catch (err) {
     console.error('Lỗi máy chủ:', err);
-    // Tránh gửi header hai lần nếu lỗi xảy ra sau khi đã flushHeaders
     if (!res.headersSent) {
         res.status(500).send(`Lỗi máy chủ: ${err.message}`);
     } else {
