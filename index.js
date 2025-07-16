@@ -48,6 +48,43 @@ function extractNextJsonObject(buffer) {
     return { object: null, remainingBuffer: buffer };
 }
 
+/**
+ * Hàm fetch có cơ chế tự động thử lại khi gặp lỗi 503 (quá tải) hoặc 429 (giới hạn truy cập).
+ * @param {string} url - URL để fetch.
+ * @param {object} options - Tùy chọn cho fetch.
+ * @param {number} retries - Số lần thử lại tối đa.
+ * @returns {Promise<Response>} - Trả về đối tượng Response nếu thành công.
+ */
+async function fetchWithRetry(url, options, retries = 3) {
+    let delay = 1000; // Đợi 1 giây cho lần thử đầu tiên
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url, options);
+            // Nếu thành công, trả về ngay lập tức
+            if (response.ok) {
+                return response;
+            }
+            // Nếu gặp lỗi có thể thử lại (quá tải, giới hạn truy cập)
+            if (response.status === 503 || response.status === 429) {
+                console.warn(`API trả về lỗi ${response.status}. Thử lại sau ${delay / 1000} giây... (Lần thử ${i + 1}/${retries})`);
+                await new Promise(res => setTimeout(res, delay));
+                delay *= 2; // Tăng thời gian chờ cho lần thử tiếp theo
+                continue; // Chuyển sang lần thử tiếp theo
+            }
+            // Đối với các lỗi khác, báo lỗi ngay lập tức
+            const errorText = await response.text();
+            throw new Error(`Lỗi không thể thử lại từ API: ${response.status} - ${errorText}`);
+
+        } catch (error) {
+            // Nếu đây là lần thử cuối cùng, ném lỗi ra ngoài
+            if (i === retries - 1) {
+                throw error;
+            }
+        }
+    }
+    throw new Error('Đã hết số lần thử lại mà vẫn không thành công.');
+}
+
 
 // Xử lý yêu cầu dịch
 app.post('/api/translate', async (req, res) => {
@@ -91,17 +128,12 @@ ${chineseText}
 `;
 
   try {
-    const geminiResponse = await fetch(apiUrl, {
+    // Sử dụng hàm fetchWithRetry thay vì fetch thông thường
+    const geminiResponse = await fetchWithRetry(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] }),
     });
-
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error('Lỗi từ Google API:', errorText);
-      throw new Error('Không nhận được phản hồi hợp lệ từ Google API.');
-    }
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -123,7 +155,6 @@ ${chineseText}
         while (processNext) {
             const result = extractNextJsonObject(buffer);
             if (result.object) {
-                // Gửi thẳng đối tượng JSON nhiều dòng, không cần ép thành một dòng nữa.
                 res.write(`data: ${result.object}\n\n`);
                 buffer = result.remainingBuffer;
             } else {
