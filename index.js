@@ -14,9 +14,8 @@ app.get('/', (req, res) => {
 
 // Xử lý yêu cầu dịch
 app.post('/api/translate', async (req, res) => {
-  // URL của Cloudflare Worker bạn đã tạo ở Bước 1
-  // !! QUAN TRỌNG: Thay thế bằng URL Worker của chính bạn !!
-  const WORKER_URL = 'https://dich-khai-thi-proxy.phamanhtuan9368.workers.dev/'; 
+  // !! QUAN TRỌNG: Thay thế bằng URL Google Apps Script của chính bạn !!
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'; 
   
   const { chineseText } = req.body;
 
@@ -24,38 +23,33 @@ app.post('/api/translate', async (req, res) => {
     return res.status(400).json({ error: 'Văn bản tiếng Trung không được để trống.' });
   }
   
-  if (WORKER_URL.includes('your-username')) {
-      return res.status(500).json({ error: 'Vui lòng cấu hình WORKER_URL trong file index.js.' });
+  if (APPS_SCRIPT_URL.includes('YOUR_SCRIPT_ID')) {
+      return res.status(500).json({ error: 'Vui lòng cấu hình APPS_SCRIPT_URL trong file index.js.' });
   }
 
   try {
-    // Gửi yêu cầu đến "trạm trung chuyển" Cloudflare Worker
-    const workerResponse = await fetch(WORKER_URL, {
+    // Gửi yêu cầu đến proxy Google Apps Script
+    const scriptResponse = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chineseText: chineseText }),
+      // Apps Script có thể chuyển hướng, cần phải theo dõi
+      redirect: 'follow'
     });
 
-    if (!workerResponse.ok) {
-        const errorText = await workerResponse.text();
-        throw new Error(`Lỗi từ Worker: ${workerResponse.status} - ${errorText}`);
+    const data = await scriptResponse.json();
+
+    if (data.error) {
+        // Chuyển tiếp lỗi từ Apps Script về cho client
+        throw new Error(data.error);
     }
 
-    // Thiết lập headers để stream về cho client
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    
-    // Chuyển tiếp (pipe) luồng dữ liệu từ Worker về thẳng cho client
-    workerResponse.body.pipe(res);
+    // Gửi kết quả dịch về cho client
+    res.status(200).json(data);
 
   } catch (err) {
     console.error('Lỗi máy chủ:', err);
-    if (!res.headersSent) {
-        res.status(500).send(`Lỗi máy chủ: ${err.message}`);
-    } else {
-        res.end();
-    }
+    res.status(500).json({ error: `Lỗi máy chủ: ${err.message}` });
   }
 });
 
