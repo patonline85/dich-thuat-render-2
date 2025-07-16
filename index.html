@@ -65,7 +65,8 @@
                 <div>
                     <label for="vietnamese-text" class="block text-lg font-semibold mb-2 text-gray-700">Bản dịch tiếng Việt</label>
                     <div class="relative">
-                        <textarea id="vietnamese-text" rows="15" class="w-full p-4 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition duration-300" placeholder="Kết quả dịch sẽ hiển thị ở đây..." readonly></textarea>
+                        <!-- Đổi textarea thành div để hiển thị định dạng tốt hơn -->
+                        <div id="vietnamese-text" style="white-space: pre-wrap; min-height: 358px;" class="w-full p-4 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition duration-300"></div>
                      </div>
                 </div>
             </div>
@@ -93,119 +94,134 @@
     
     <div id="toast" class="toast"></div>
 
-		<script>
-			document.addEventListener('DOMContentLoaded', () => { // DOM Elements
-			const translateButton = document.getElementById('translate-button');
-			const chineseTextArea = document.getElementById('chinese-text');
-			const vietnameseTextArea = document.getElementById('vietnamese-text');
-			const copyButton = document.getElementById('copy-button');
-			const clearButton = document.getElementById('clear-button');
-			const loader = document.getElementById('loader');
-			const buttonText = document.getElementById('button-text');
-			const toast = document.getElementById('toast');
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const translateButton = document.getElementById('translate-button');
+            const chineseTextArea = document.getElementById('chinese-text');
+            const vietnameseOutputDiv = document.getElementById('vietnamese-text');
+            const copyButton = document.getElementById('copy-button');
+            const clearButton = document.getElementById('clear-button');
+            const loader = document.getElementById('loader');
+            const buttonText = document.getElementById('button-text');
+            const toast = document.getElementById('toast');
 
-			// --- Utility Functions ---
-			const showToast = (message) => {
-				toast.textContent = message;
-				toast.classList.add('show');
-				setTimeout(() => toast.classList.remove('show'), 3000);
-			};
+            const showToast = (message) => {
+                toast.textContent = message;
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 3000);
+            };
 
-			// --- Event Listeners ---
-			clearButton.addEventListener('click', () => {
-				chineseTextArea.value = '';
-				vietnameseTextArea.value = '';
-				showToast('Đã xóa nội dung.');
-			});
+            clearButton.addEventListener('click', () => {
+                chineseTextArea.value = '';
+                vietnameseOutputDiv.textContent = '';
+                showToast('Đã xóa nội dung.');
+            });
+            
+            translateButton.addEventListener('click', async () => {
+                const chineseText = chineseTextArea.value.trim();
+                if (!chineseText) {
+                    showToast("Vui lòng nhập văn bản tiếng Trung.");
+                    return;
+                }
+                
+                loader.classList.remove('hidden');
+                buttonText.textContent = 'Đang dịch...';
+                translateButton.disabled = true;
+                vietnameseOutputDiv.textContent = '';
+                vietnameseOutputDiv.style.color = 'inherit';
 
-			// --- Translation Logic ---
-			translateButton.addEventListener('click', async () => {
-				const chineseText = chineseTextArea.value.trim();
+                try {
+                    const response = await fetch('/api/translate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chineseText: chineseText })
+                    });
 
-				if (!chineseText) {
-					showToast("Vui lòng nhập văn bản tiếng Trung.");
-					return;
-				}
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(errorText);
+                    }
 
-				loader.classList.remove('hidden');
-				buttonText.textContent = 'Đang dịch...';
-				translateButton.disabled = true;
-				vietnameseTextArea.value = '';
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
 
-				try {
-					const response = await fetch('/api/translate', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ chineseText })
-					});
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) {
+                            // Xử lý phần còn lại trong buffer nếu có
+                            if (buffer.startsWith('data: ')) {
+                                try {
+                                    const jsonStr = buffer.substring(6);
+                                    const parsed = JSON.parse(jsonStr);
+                                    const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                                    if (textPart) {
+                                        vietnameseOutputDiv.textContent += textPart;
+                                    }
+                                } catch (e) {
+                                     console.warn("Bỏ qua chunk cuối cùng không hợp lệ:", buffer);
+                                }
+                            }
+                            break;
+                        }
+                        
+                        buffer += decoder.decode(value, { stream: true });
+                        
+                        // **** ĐÂY LÀ PHẦN ĐÃ ĐƯỢC SỬA LỖI ****
+                        // Tìm các dòng hoàn chỉnh (kết thúc bằng newline) để xử lý
+                        let boundary;
+                        while ((boundary = buffer.indexOf('\n')) >= 0) {
+                            const line = buffer.substring(0, boundary).trim();
+                            buffer = buffer.substring(boundary + 1); // Giữ lại phần còn lại trong buffer
 
-					if (!response.ok) {
-						const errorText = await response.text();
-						throw new Error(errorText || 'Lỗi không xác định từ máy chủ.');
-					}
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    const jsonStr = line.substring(6);
+                                    if (jsonStr) {
+                                        const parsed = JSON.parse(jsonStr);
+                                        const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                                        if (textPart) {
+                                            vietnameseOutputDiv.textContent += textPart;
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn("Bỏ qua chunk JSON không hợp lệ:", line);
+                                }
+                            }
+                        }
+                    }
 
-					const reader = response.body.getReader();
-					const decoder = new TextDecoder();
-					let buffer = '';
+                } catch (error) {
+                    console.error("Lỗi chi tiết khi dịch:", error);
+                    vietnameseOutputDiv.textContent = `Đã xảy ra lỗi khi dịch. Vui lòng thử lại sau.\n\nChi tiết: ${error.message}`;
+                    vietnameseOutputDiv.style.color = 'red';
+                    showToast("Đã có lỗi xảy ra. Vui lòng thử lại.");
+                } finally {
+                    loader.classList.add('hidden');
+                    buttonText.textContent = 'Dịch văn bản';
+                    translateButton.disabled = false;
+                }
+            });
 
-					while (true) {
-						const { done, value } = await reader.read();
-						if (done) break;
+            copyButton.addEventListener('click', () => {
+                const chineseText = chineseTextArea.value.trim();
+                const vietnameseText = vietnameseOutputDiv.textContent.trim();
 
-						buffer += decoder.decode(value, { stream: true });
+                if (!chineseText && !vietnameseText) {
+                    showToast("Không có nội dung để sao chép.");
+                    return;
+                }
 
-						// Mỗi chunk server gửi về nên là JSON
-						const parts = buffer.split('\n').filter(line => line.trim() !== '');
-						for (let part of parts) {
-							try {
-								const json = JSON.parse(part);
-								const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-								vietnameseTextArea.value += text;
-							} catch (err) {
-								// ignore parse errors (nếu chunk chưa hoàn chỉnh)
-							}
-						}
-
-						buffer = ''; // clear buffer sau mỗi lần đọc
-					}
-
-				} catch (error) {
-					console.error("Lỗi chi tiết khi dịch:", error);
-					vietnameseTextArea.value = `Đã xảy ra lỗi khi dịch. Vui lòng thử lại sau.\n\nChi tiết: ${error.message}`;
-					showToast("Đã có lỗi xảy ra. Vui lòng thử lại.");
-				} finally {
-					loader.classList.add('hidden');
-					buttonText.textContent = 'Dịch văn bản';
-					translateButton.disabled = false;
-				}
-			});
-
-			// --- Copy Function ---
-			copyButton.addEventListener('click', () => {
-				const chineseText = chineseTextArea.value.trim();
-				const vietnameseText = vietnameseTextArea.value.trim();
-
-				if (!chineseText && !vietnameseText) {
-					showToast("Không có nội dung để sao chép.");
-					return;
-				}
-
-				const textToCopy = `Bản gốc:\n${chineseText}\n\nBản dịch:\n${vietnameseText}`;
-
-				const tempTextArea = document.createElement('textarea');
-				tempTextArea.value = textToCopy;
-				document.body.appendChild(tempTextArea);
-				tempTextArea.select();
-				try {
-					document.execCommand('copy');
-					showToast("Đã sao chép bản gốc và bản dịch!");
-				} catch (err) {
-					console.error('Không thể sao chép: ', err);
-					showToast("Lỗi! Không thể sao chép.");
-				}
-				document.body.removeChild(tempTextArea);
-			});
-		});
-	</script>
+                const textToCopy = `Bản gốc:\n${chineseText}\n\nBản dịch:\n${vietnameseText}`;
+                
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    showToast("Đã sao chép bản gốc và bản dịch!");
+                }).catch(err => {
+                    console.error('Không thể sao chép: ', err);
+                    showToast("Lỗi! Không thể sao chép.");
+                });
+            });
+        });
+    </script>
 </body>
 </html>
