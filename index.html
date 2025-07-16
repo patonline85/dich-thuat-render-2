@@ -63,11 +63,13 @@
                 </div>
 
                 <div>
-                    <label for="vietnamese-text" class="block text-lg font-semibold mb-2 text-gray-700">Bản dịch tiếng Việt</label>
-                    <div class="relative">
-                        <!-- Đổi textarea thành div để hiển thị định dạng tốt hơn -->
-                        <div id="vietnamese-text" style="white-space: pre-wrap; min-height: 358px;" class="w-full p-4 border border-gray-300 rounded-lg bg-gray-100 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition duration-300"></div>
-                     </div>
+                    <label id="vietnamese-output-label" class="block text-lg font-semibold mb-2 text-gray-700">Bản dịch tiếng Việt</label>
+                    <div id="vietnamese-text"
+                         role="status"
+                         aria-live="polite"
+                         aria-labelledby="vietnamese-output-label"
+                         style="white-space: pre-wrap; min-height: 358px;"
+                         class="w-full p-4 border border-gray-300 rounded-lg bg-gray-100 transition duration-300"></div>
                 </div>
             </div>
 
@@ -139,7 +141,7 @@
 
                     if (!response.ok) {
                         const errorText = await response.text();
-                        throw new Error(errorText);
+                        throw new Error(errorText || `Lỗi từ server: ${response.status}`);
                     }
 
                     const reader = response.body.getReader();
@@ -149,34 +151,24 @@
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) {
-                            // Xử lý phần còn lại trong buffer nếu có
-                            if (buffer.startsWith('data: ')) {
-                                try {
-                                    const jsonStr = buffer.substring(6);
-                                    const parsed = JSON.parse(jsonStr);
-                                    const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-                                    if (textPart) {
-                                        vietnameseOutputDiv.textContent += textPart;
-                                    }
-                                } catch (e) {
-                                     console.warn("Bỏ qua chunk cuối cùng không hợp lệ:", buffer);
-                                }
-                            }
                             break;
                         }
                         
                         buffer += decoder.decode(value, { stream: true });
                         
-                        // **** ĐÂY LÀ PHẦN ĐÃ ĐƯỢC SỬA LỖI ****
-                        // Tìm các dòng hoàn chỉnh (kết thúc bằng newline) để xử lý
-                        let boundary;
-                        while ((boundary = buffer.indexOf('\n')) >= 0) {
-                            const line = buffer.substring(0, boundary).trim();
-                            buffer = buffer.substring(boundary + 1); // Giữ lại phần còn lại trong buffer
+                        // SỬA LỖI QUAN TRỌNG: Xử lý các gói dữ liệu (event) hoàn chỉnh
+                        // Một event được ngăn cách bởi hai ký tự xuống dòng (\n\n)
+                        let eventBoundary;
+                        while ((eventBoundary = buffer.indexOf('\n\n')) >= 0) {
+                            // Lấy toàn bộ nội dung của một event
+                            const eventText = buffer.substring(0, eventBoundary);
+                            // Cập nhật lại buffer, bỏ đi phần đã xử lý
+                            buffer = buffer.substring(eventBoundary + 2);
 
-                            if (line.startsWith('data: ')) {
+                            if (eventText.startsWith('data:')) {
                                 try {
-                                    const jsonStr = line.substring(6);
+                                    // Bỏ 'data: ' và lấy chuỗi JSON
+                                    const jsonStr = eventText.substring(6).trim();
                                     if (jsonStr) {
                                         const parsed = JSON.parse(jsonStr);
                                         const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -185,7 +177,7 @@
                                         }
                                     }
                                 } catch (e) {
-                                    console.warn("Bỏ qua chunk JSON không hợp lệ:", line);
+                                    console.warn("Bỏ qua chunk JSON không hợp lệ:", eventText, e);
                                 }
                             }
                         }
@@ -214,12 +206,21 @@
 
                 const textToCopy = `Bản gốc:\n${chineseText}\n\nBản dịch:\n${vietnameseText}`;
                 
-                navigator.clipboard.writeText(textToCopy).then(() => {
+                // Sử dụng document.execCommand để tương thích tốt hơn trong iframe
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "fixed"; // Tránh cuộn trang
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
                     showToast("Đã sao chép bản gốc và bản dịch!");
-                }).catch(err => {
+                } catch (err) {
                     console.error('Không thể sao chép: ', err);
                     showToast("Lỗi! Không thể sao chép.");
-                });
+                }
+                document.body.removeChild(textArea);
             });
         });
     </script>
