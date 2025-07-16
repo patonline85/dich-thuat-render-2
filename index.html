@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trợ Lý Dịch Khai Thị - Ứng dụng Dịch thuật Phật giáo</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -10,140 +10,139 @@
     body { font-family: 'Inter', sans-serif; }
     .loader { border-top-color: #3498db; animation: spin 1s linear infinite; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    .toast {
-      visibility: hidden; min-width: 250px; background-color: #333; color: #fff;
-      text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 100;
-      left: 50%; transform: translateX(-50%); bottom: 30px; opacity: 0; transition: opacity 0.5s, visibility 0.5s;
-    }
+    .toast { visibility: hidden; min-width: 250px; background: #333; color: #fff; text-align: center; border-radius: 8px;
+             padding: 16px; position: fixed; z-index: 100; left: 50%; transform: translateX(-50%); bottom: 30px;
+             opacity: 0; transition: opacity 0.5s, visibility 0.5s; }
     .toast.show { visibility: visible; opacity: 1; }
   </style>
 </head>
 <body class="bg-[#fffbbe] text-gray-800">
-  <div class="container mx-auto p-4 md:p-8">
-    <header class="text-center mb-8">
-      <div class="flex justify-center items-center mb-4">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" class="text-teal-600">
-          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-        </svg>
-        <h1 class="text-3xl md:text-4xl font-bold text-teal-700 ml-3">Trợ Lý Dịch Khai Thị</h1>
-      </div>
-      <p class="text-md text-gray-600">Ứng dụng dịch thuật chuyên ngành Phật giáo từ Trung sang Việt</p>
-    </header>
-    <main class="bg-white p-6 rounded-2xl shadow-lg">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <label for="chinese-text" class="block text-lg font-semibold text-gray-700">Văn bản tiếng Trung (Giản thể)</label>
-            <button id="clear-button" class="text-sm text-red-500 hover:text-red-700 font-semibold flex items-center p-1 rounded-md">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="mr-1">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg> Xóa
-            </button>
-          </div>
-          <textarea id="chinese-text" rows="15" class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"></textarea>
-        </div>
-        <div>
-          <label for="vietnamese-text" class="block text-lg font-semibold mb-2 text-gray-700">Bản dịch tiếng Việt</label>
-          <div class="relative">
-            <div id="vietnamese-text" style="white-space: pre-wrap; min-height: 358px;" class="w-full p-4 border border-gray-300 rounded-lg bg-gray-100"></div>
-          </div>
-        </div>
-      </div>
-      <div class="text-center mt-6 flex justify-center items-center space-x-4">
-        <button id="translate-button" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-8 rounded-lg flex items-center">
-          <svg id="loader" class="loader hidden border-4 border-t-4 border-gray-200 h-6 w-6 mr-3" viewBox="0 0 24 24"></svg>
-          <span id="button-text">Dịch văn bản</span>
-        </button>
-        <button id="copy-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="mr-2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg> Sao chép
-        </button>
-      </div>
-    </main>
-    <footer class="text-center mt-8 text-gray-500 text-sm">
-      <div class="mt-8 bg-white p-6 rounded-2xl shadow-lg">
-        <p class="italic leading-relaxed text-gray-700">
-          🙏🙏🙏 Vì tâm nguyện con muốn hoằng dương Pháp Môn Tâm Linh...
-        </p>
-      </div>
-    </footer>
-  </div>
-  <div id="toast" class="toast"></div>
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const translateButton = document.getElementById('translate-button');
-      const chineseTextArea = document.getElementById('chinese-text');
-      const vietnameseOutputDiv = document.getElementById('vietnamese-text');
-      const copyButton = document.getElementById('copy-button');
-      const clearButton = document.getElementById('clear-button');
-      const loader = document.getElementById('loader');
-      const buttonText = document.getElementById('button-text');
-      const toast = document.getElementById('toast');
 
-      const showToast = (message) => {
-        toast.textContent = message;
-        toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3000);
-      };
+<!-- GIỮ NGUYÊN giao diện gốc của bạn -->
+<div class="container mx-auto p-4 md:p-8">
+  <!-- ... header và main như của bạn ... -->
+  
+  <header class="text-center mb-8">
+    <div class="flex justify-center items-center mb-4">
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" class="text-teal-600">
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+      </svg>
+      <h1 class="text-3xl md:text-4xl font-bold text-teal-700 ml-3">Trợ Lý Dịch Khai Thị</h1>
+    </div>
+    <p class="text-md text-gray-600">Ứng dụng dịch thuật chuyên ngành Phật giáo từ Trung sang Việt</p>
+  </header>
 
-      clearButton.addEventListener('click', () => {
-        chineseTextArea.value = '';
-        vietnameseOutputDiv.textContent = '';
-        showToast('Đã xóa nội dung.');
+  <main class="bg-white p-6 rounded-2xl shadow-lg">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <div class="flex justify-between items-center mb-2">
+          <label for="chinese-text" class="block text-lg font-semibold text-gray-700">Văn bản tiếng Trung (Giản thể)</label>
+          <button id="clear-button" class="text-sm text-red-500 hover:text-red-700 font-semibold flex items-center p-1 rounded-md">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="mr-1">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>Xóa
+          </button>
+        </div>
+        <textarea id="chinese-text" rows="15" class="w-full p-4 border border-gray-300 rounded-lg"></textarea>
+      </div>
+      <div>
+        <label for="vietnamese-text" class="block text-lg font-semibold mb-2 text-gray-700">Bản dịch tiếng Việt</label>
+        <textarea id="vietnamese-text" rows="15" class="w-full p-4 border border-gray-300 rounded-lg bg-gray-100" readonly></textarea>
+      </div>
+    </div>
+    <div class="text-center mt-6 flex justify-center items-center space-x-4">
+      <button id="translate-button" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-8 rounded-lg flex items-center">
+        <svg id="loader" class="loader hidden border-4 border-t-4 border-gray-200 h-6 w-6 mr-3" viewBox="0 0 24 24"></svg>
+        <span id="button-text">Dịch văn bản</span>
+      </button>
+      <button id="copy-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" class="mr-2">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>Sao chép
+      </button>
+    </div>
+  </main>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const translateButton = document.getElementById('translate-button');
+  const chineseTextArea = document.getElementById('chinese-text');
+  const vietnameseTextArea = document.getElementById('vietnamese-text');
+  const loader = document.getElementById('loader');
+  const buttonText = document.getElementById('button-text');
+  const toast = document.getElementById('toast');
+  const clearButton = document.getElementById('clear-button');
+  const copyButton = document.getElementById('copy-button');
+
+  const showToast = (msg) => {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  };
+
+  clearButton.addEventListener('click', () => {
+    chineseTextArea.value = '';
+    vietnameseTextArea.value = '';
+    showToast('Đã xóa nội dung.');
+  });
+
+  copyButton.addEventListener('click', () => {
+    const text = `Bản gốc:\n${chineseTextArea.value}\n\nBản dịch:\n${vietnameseTextArea.value}`;
+    navigator.clipboard.writeText(text).then(() => showToast('Đã sao chép!'));
+  });
+
+  translateButton.addEventListener('click', async () => {
+    const chineseText = chineseTextArea.value.trim();
+    if (!chineseText) { showToast("Vui lòng nhập văn bản."); return; }
+    loader.classList.remove('hidden');
+    buttonText.textContent = 'Đang dịch...';
+    translateButton.disabled = true;
+    vietnameseTextArea.value = '';
+
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chineseText })
       });
+      if (!response.ok) throw new Error(await response.text());
 
-      translateButton.addEventListener('click', async () => {
-        const chineseText = chineseTextArea.value.trim();
-        if (!chineseText) { showToast("Vui lòng nhập văn bản tiếng Trung."); return; }
-        loader.classList.remove('hidden');
-        buttonText.textContent = 'Đang dịch...';
-        translateButton.disabled = true;
-        vietnameseOutputDiv.textContent = '';
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = '';
 
-        try {
-          const response = await fetch('/api/translate', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chineseText })
-          });
-          if (!response.ok) throw new Error(await response.text());
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const chunks = buffer.split('\n').filter(line => line.trim());
-            buffer = ''; // clear after processing
-            for (const chunk of chunks) {
-              try {
-                const json = JSON.parse(chunk);
-                const textPart = json.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (textPart) vietnameseOutputDiv.textContent += textPart;
-              } catch (e) { /* ignore */ }
-            }
-          }
-        } catch (error) {
-          console.error(error);
-          vietnameseOutputDiv.textContent = 'Đã xảy ra lỗi khi dịch: ' + error.message;
-          showToast("Lỗi! Vui lòng thử lại.");
-        } finally {
-          loader.classList.add('hidden');
-          buttonText.textContent = 'Dịch văn bản';
-          translateButton.disabled = false;
+        const lines = textBuffer.split('\n').filter(Boolean);
+        textBuffer = ''; // reset buffer
+
+        for (const line of lines) {
+          try {
+            const json = JSON.parse(line);
+            const part = json.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (part) vietnameseTextArea.value += part;
+          } catch { /* ignore parse errors */ }
         }
-      });
+      }
 
-      copyButton.addEventListener('click', () => {
-        const text = `Bản gốc:\n${chineseTextArea.value.trim()}\n\nBản dịch:\n${vietnameseOutputDiv.textContent.trim()}`;
-        navigator.clipboard.writeText(text).then(() => showToast("Đã sao chép!"));
-      });
-    });
-  </script>
+    } catch (err) {
+      console.error(err);
+      vietnameseTextArea.value = "Đã xảy ra lỗi khi dịch: " + err.message;
+      showToast("Lỗi! Vui lòng thử lại.");
+    } finally {
+      loader.classList.add('hidden');
+      buttonText.textContent = 'Dịch văn bản';
+      translateButton.disabled = false;
+    }
+  });
+});
+</script>
 </body>
 </html>
