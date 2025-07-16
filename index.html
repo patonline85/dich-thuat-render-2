@@ -59,17 +59,18 @@
                             Xóa
                         </button>
                     </div>
-                   <textarea id="chinese-text" rows="15" class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition duration-300" placeholder="Nhập hoặc dán văn bản tiếng Trung cần dịch vào đây..."></textarea>
+                   <!-- THAY ĐỔI: Bỏ rows="15" và thêm class h-96 để có chiều cao cố định -->
+                   <textarea id="chinese-text" class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition duration-300 h-96" placeholder="Nhập hoặc dán văn bản tiếng Trung cần dịch vào đây..."></textarea>
                 </div>
 
                 <div>
                     <label id="vietnamese-output-label" class="block text-lg font-semibold mb-2 text-gray-700">Bản dịch tiếng Việt</label>
+                    <!-- THAY ĐỔI: Bỏ style inline, thêm class h-96 và overflow-y-auto -->
                     <div id="vietnamese-text"
                          role="status"
                          aria-live="polite"
                          aria-labelledby="vietnamese-output-label"
-                         style="white-space: pre-wrap; min-height: 358px;"
-                         class="w-full p-4 border border-gray-300 rounded-lg bg-gray-100 transition duration-300"></div>
+                         class="w-full p-4 border border-gray-300 rounded-lg bg-gray-100 transition duration-300 h-96 overflow-y-auto whitespace-pre-wrap"></div>
                 </div>
             </div>
 
