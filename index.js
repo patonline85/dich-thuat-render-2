@@ -109,7 +109,12 @@ ${chineseText}
         while (processNext) {
             const result = extractNextJsonObject(buffer);
             if (result.object) {
-                res.write(`data: ${result.object}\n\n`);
+                // SỬA LỖI: Chuyển JSON nhiều dòng thành một dòng duy nhất
+                // Phía client (index.html) đang có lỗi xử lý JSON trên nhiều dòng.
+                // Giải pháp này sẽ "ép" JSON thành một dòng duy nhất trước khi gửi để client có thể xử lý.
+                const compactJsonObject = JSON.stringify(JSON.parse(result.object));
+                res.write(`data: ${compactJsonObject}\n\n`);
+                
                 buffer = result.remainingBuffer;
             } else {
                 processNext = false;
