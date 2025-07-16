@@ -16,7 +16,7 @@ app.get('/', (req, res) => {
 app.post('/api/translate', async (req, res) => {
   // URL của Cloudflare Worker bạn đã tạo ở Bước 1
   // !! QUAN TRỌNG: Thay thế bằng URL Worker của chính bạn !!
-  const WORKER_URL = 'https://dich-khai-thi-proxy.your-username.workers.dev'; 
+  const WORKER_URL = 'https://dich-khai-thi-proxy.phamanhtuan9368.workers.dev/'; 
   
   const { chineseText } = req.body;
 
