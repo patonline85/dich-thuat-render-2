@@ -12,6 +12,43 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+/**
+ * Trích xuất đối tượng JSON hoàn chỉnh đầu tiên từ một chuỗi buffer.
+ * @param {string} buffer - Chuỗi chứa dữ liệu JSON đang được stream.
+ * @returns {{object: string|null, remainingBuffer: string}} - Trả về đối tượng JSON tìm thấy và phần còn lại của buffer.
+ */
+function extractNextJsonObject(buffer) {
+    const objectStartIndex = buffer.indexOf('{');
+    if (objectStartIndex === -1) {
+        return { object: null, remainingBuffer: buffer };
+    }
+
+    let braceCount = 1;
+    for (let i = objectStartIndex + 1; i < buffer.length; i++) {
+        if (buffer[i] === '{') {
+            braceCount++;
+        } else if (buffer[i] === '}') {
+            braceCount--;
+        }
+
+        if (braceCount === 0) {
+            const objectEndIndex = i + 1;
+            const objectStr = buffer.substring(objectStartIndex, objectEndIndex);
+            try {
+                JSON.parse(objectStr);
+                return {
+                    object: objectStr,
+                    remainingBuffer: buffer.substring(objectEndIndex)
+                };
+            } catch (e) {
+                // Không phải là JSON hợp lệ, tiếp tục tìm kiếm
+            }
+        }
+    }
+    return { object: null, remainingBuffer: buffer };
+}
+
+
 // Xử lý yêu cầu dịch
 app.post('/api/translate', async (req, res) => {
   const apiKey = process.env.GOOGLE_API_KEY;
@@ -29,7 +66,7 @@ app.post('/api/translate', async (req, res) => {
   const prompt = `
 **Yêu cầu nhiệm vụ (TUÂN THỦ TUYỆT ĐỐI):**
 Bạn PHẢI hành động như "Trợ Lý Dịch Khai Thị". Giọng điệu của bạn phải trang nghiêm, từ tốn, và đầy lòng từ bi, giống như một bậc thầy đang giảng giải Phật Pháp. Khi dịch và giải thích, bạn phải dùng ngôn ngữ Phật học chính xác, dễ hiểu, phù hợp với người Việt.
-**Nhiệm vụ:**
+**Nhiệmvụ:**
 1.  **Dịch Chính Xác:** Dịch đoạn văn bản tiếng Trung sang tiếng Việt.
 2.  **Khai Thị (Giải Thích):** Sau khi dịch, bạn phải viết một đoạn "KHAI THỊ" để giải thích ý nghĩa sâu xa của đoạn văn, đặc biệt là các thuật ngữ Phật học, và đưa ra lời khuyên tu tập dựa trên nội dung đó.
 3.  **Định dạng:** Trình bày rõ ràng phần "Bản Dịch" và "Khai Thị".
@@ -52,7 +89,6 @@ ${chineseText}
       throw new Error('Không nhận được phản hồi hợp lệ từ Google API.');
     }
 
-    // Thiết lập đúng headers cho Server-Sent Events (SSE)
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -62,47 +98,22 @@ ${chineseText}
     const decoder = new TextDecoder();
     let buffer = '';
 
-    // Hàm xử lý buffer để tìm các đối tượng JSON hoàn chỉnh
-    const processBuffer = () => {
-        let braceCount = 0;
-        let objectStartIndex = -1;
-
-        for (let i = 0; i < buffer.length; i++) {
-            if (buffer[i] === '{') {
-                if (braceCount === 0) {
-                    objectStartIndex = i;
-                }
-                braceCount++;
-            } else if (buffer[i] === '}') {
-                braceCount--;
-                if (braceCount === 0 && objectStartIndex !== -1) {
-                    const objectStr = buffer.substring(objectStartIndex, i + 1);
-                    try {
-                        JSON.parse(objectStr); 
-                        res.write(`data: ${objectStr}\n\n`);
-                        buffer = buffer.substring(i + 1);
-                        i = -1; 
-                        objectStartIndex = -1;
-                    } catch (e) {
-                        // Bỏ qua nếu không phải JSON hợp lệ và tiếp tục tìm kiếm
-                    }
-                }
-            }
-        }
-    };
-
-    // Vòng lặp đọc dữ liệu từ Google
     while (true) {
         const { done, value } = await reader.read();
-        
-        // SỬA LỖI QUAN TRỌNG:
-        // Giải mã chunk dữ liệu, sử dụng { stream: !done } để xử lý chính xác
-        // các ký tự đa byte (như tiếng Việt) bị ngắt quãng giữa các chunk.
-        buffer += decoder.decode(value, { stream: !done });
-        processBuffer();
-
         if (done) {
             break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+
+        let processNext = true;
+        while (processNext) {
+            const result = extractNextJsonObject(buffer);
+            if (result.object) {
+                res.write(`data: ${result.object}\n\n`);
+                buffer = result.remainingBuffer;
+            } else {
+                processNext = false;
+            }
         }
     }
 
