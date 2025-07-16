@@ -15,7 +15,7 @@ app.get('/', (req, res) => {
 // Xử lý yêu cầu dịch
 app.post('/api/translate', async (req, res) => {
   // !! QUAN TRỌNG: Thay thế bằng URL Google Apps Script của chính bạn !!
-  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec'; 
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8-KHfmVNUQ87Qdw3qk43ql_mI87Qy3KIpECE2GkUpPQx0DF7SD7qCIRT2aNm0xH_Q9A/exec'; 
   
   const { chineseText } = req.body;
 
@@ -23,7 +23,7 @@ app.post('/api/translate', async (req, res) => {
     return res.status(400).json({ error: 'Văn bản tiếng Trung không được để trống.' });
   }
   
-  if (APPS_SCRIPT_URL.includes('YOUR_SCRIPT_ID')) {
+  if (APPS_SCRIPT_URL.includes('AKfycbw8-KHfmVNUQ87Qdw3qk43ql_mI87Qy3KIpECE2GkUpPQx0DF7SD7qCIRT2aNm0xH_Q9A')) {
       return res.status(500).json({ error: 'Vui lòng cấu hình APPS_SCRIPT_URL trong file index.js.' });
   }
 
