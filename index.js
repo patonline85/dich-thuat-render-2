@@ -55,8 +55,8 @@ function extractNextJsonObject(buffer) {
  * @param {number} retries - Số lần thử lại tối đa.
  * @returns {Promise<Response>} - Trả về đối tượng Response nếu thành công.
  */
-async function fetchWithRetry(url, options, retries = 3) {
-    let delay = 1000; // Đợi 1 giây cho lần thử đầu tiên
+async function fetchWithRetry(url, options, retries = 5) { // Tăng số lần thử lại lên 5
+    let delay = 2000; // Tăng thời gian chờ ban đầu lên 2 giây
     for (let i = 0; i < retries; i++) {
         try {
             const response = await fetch(url, options);
@@ -68,7 +68,8 @@ async function fetchWithRetry(url, options, retries = 3) {
             if (response.status === 503 || response.status === 429) {
                 console.warn(`API trả về lỗi ${response.status}. Thử lại sau ${delay / 1000} giây... (Lần thử ${i + 1}/${retries})`);
                 await new Promise(res => setTimeout(res, delay));
-                delay *= 2; // Tăng thời gian chờ cho lần thử tiếp theo
+                // Tăng thời gian chờ cho lần thử tiếp theo và thêm một khoảng ngẫu nhiên nhỏ
+                delay = delay * 2 + Math.floor(Math.random() * 1000); 
                 continue; // Chuyển sang lần thử tiếp theo
             }
             // Đối với các lỗi khác, báo lỗi ngay lập tức
