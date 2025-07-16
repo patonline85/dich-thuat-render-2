@@ -1,8 +1,8 @@
 require('dotenv').config();
 const express = require('express');
-// 'node-fetch' không còn cần thiết nếu bạn dùng Node.js v18+
-// const fetch = require('node-fetch'); 
 const path = require('path');
+// node-fetch không còn cần thiết nếu bạn dùng Node.js v18+
+// const fetch = require('node-fetch');
 
 const app = express();
 app.use(express.json());
@@ -52,37 +52,76 @@ ${chineseText}
       throw new Error('Không nhận được phản hồi hợp lệ từ Google API.');
     }
 
-    // 1. THAY ĐỔI QUAN TRỌNG: Thiết lập đúng headers cho Server-Sent Events (SSE)
+    // Thiết lập đúng headers cho Server-Sent Events (SSE)
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders(); // Gửi headers ngay lập tức
+    res.flushHeaders();
 
-    // 2. THAY ĐỔI QUAN TRỌNG: Không dùng .pipe(). Thay vào đó, đọc stream thủ công
     const reader = geminiResponse.body.getReader();
     const decoder = new TextDecoder();
+    let buffer = '';
 
+    // Hàm xử lý buffer để tìm các đối tượng JSON hoàn chỉnh
+    const processBuffer = () => {
+        // Luồng dữ liệu từ Google là một chuỗi JSON array, ví dụ: "[{...}, {...}]"
+        // Chúng ta cần tìm từng đối tượng {...} hoàn chỉnh một.
+        let braceCount = 0;
+        let objectStartIndex = -1;
+
+        for (let i = 0; i < buffer.length; i++) {
+            if (buffer[i] === '{') {
+                if (braceCount === 0) {
+                    objectStartIndex = i;
+                }
+                braceCount++;
+            } else if (buffer[i] === '}') {
+                braceCount--;
+                if (braceCount === 0 && objectStartIndex !== -1) {
+                    // Khi số lượng dấu '{' và '}' bằng nhau, ta đã tìm thấy một đối tượng hoàn chỉnh
+                    const objectStr = buffer.substring(objectStartIndex, i + 1);
+                    
+                    try {
+                        // Kiểm tra xem có phải là JSON hợp lệ không
+                        JSON.parse(objectStr); 
+                        // Gửi đối tượng JSON hợp lệ này về client theo đúng định dạng SSE
+                        res.write(`data: ${objectStr}\n\n`);
+                        
+                        // Cắt bỏ phần đã xử lý khỏi buffer
+                        buffer = buffer.substring(i + 1);
+                        // Reset vòng lặp để quét phần còn lại của buffer
+                        i = -1; 
+                        objectStartIndex = -1;
+                    } catch (e) {
+                        // Bỏ qua nếu không phải JSON hợp lệ (ví dụ: chuỗi có chứa dấu '{' hoặc '}')
+                        // và tiếp tục tìm kiếm
+                    }
+                }
+            }
+        }
+    };
+
+    // Vòng lặp đọc dữ liệu từ Google
     while (true) {
         const { done, value } = await reader.read();
         if (done) {
             break;
         }
-        // 3. Gói mỗi chunk dữ liệu vào đúng định dạng SSE
-        const chunk = decoder.decode(value);
-        // Dữ liệu từ Google trả về có thể chứa nhiều dòng, ta cần xử lý từng dòng
-        const lines = chunk.split('\n').filter(line => line.trim() !== '');
-        for (const line of lines) {
-            // Gửi từng dòng về cho client với định dạng "data: ...\n\n"
-             res.write(`data: ${line}\n\n`);
-        }
+        // Thêm dữ liệu mới vào buffer và xử lý
+        buffer += decoder.decode(value);
+        processBuffer();
     }
 
-    // 4. Kết thúc response khi stream hoàn tất
     res.end();
 
   } catch (err) {
     console.error('Lỗi máy chủ:', err);
-    res.status(500).send(`Lỗi máy chủ: ${err.message}`);
+    // Tránh gửi header hai lần nếu lỗi xảy ra sau khi đã flushHeaders
+    if (!res.headersSent) {
+        res.status(500).send(`Lỗi máy chủ: ${err.message}`);
+    } else {
+        res.end();
+    }
   }
 });
 
